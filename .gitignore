@@ -1,0 +1,4 @@
+*.swp
+*-browserify.js
+node_modules
+private
