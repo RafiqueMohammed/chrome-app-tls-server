@@ -1,0 +1,35 @@
+{
+  "name": "chrome-app-tls-server",
+  "version": "0.0.1",
+  "description": "An https server in a chrome app",
+  "main": "response-text.js",
+  "dependencies": {
+    "brfs": "^1.4.0",
+    "browserify": "*"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rise-Vision/chrome-app-tls-server.git"
+  },
+  "keywords": [
+    "chrome",
+    "app",
+    "https",
+    "tls"
+  ],
+  "author": "Tyler Johnson",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/Rise-Vision/chrome-app-tls-server/issues"
+  },
+  "homepage": "https://github.com/Rise-Vision/chrome-app-tls-server#readme",
+  "scripts": {
+    "pretest": "npm install && node_modules/browserify/bin/cmd.js -t brfs server.js -o server-browserify.js ",
+    "test": "chromium --load-and-launch-app=$(pwd); sleep 2; curl -vv -k 'https://localhost:9999' |grep --color=always '>hi<'"
+  }
+}

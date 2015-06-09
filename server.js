@@ -1,17 +1,10 @@
-var privateKey = require("./private/key.js"),
-    certificate = require("./private/certificate.js"),
-    receiveTextBuffers = {}, tlsConnections = {}, closeSignals = {}
-
-crlf = "\r\n",
-
-responseText = "HTTP/1.1 200 OK" + crlf +
-new Date().toString() + crlf +
-"Content-Type: text/html" + crlf +
-"Content-Length: 58" + crlf +
-"Access-Control-Allow-Origin: *" + crlf +
-"Connection: close" + crlf +
-crlf +
-"<!doctype html><html><head></head><body>hi</body></html>" + crlf;
+var fs = require("fs");
+var receiveTextBuffers = {};
+var tlsConnections = {};
+var serverSideCloseRequests = {};
+var privateKey = fs.readFileSync(__dirname + "/server.key", "utf8");
+var certificate = fs.readFileSync(__dirname + "/server.crt", "utf8");
+var responseText = require("./response-text.js");
 
 chrome.sockets.tcpServer.create({}, function(createInfo) {
     listenAndAccept(createInfo.socketId);
@@ -47,7 +40,7 @@ chrome.sockets.tcp.onReceive.addListener(function(recvInfo) {
   console.log("received data length " + recvInfo.data.byteLength + " on socket " + recvInfo.socketId);
   stringifiedData = arrayBufferToString(recvInfo.data);
 
-  console.log("processing encrypted data");
+  console.log("processing encrypted data through tls");
   tlsConnections[recvInfo.socketId].process(stringifiedData);
 });
 
@@ -76,15 +69,12 @@ var stringToUint8Array = function(string) {
 
 var closeConnections = function(socketId) {
   chrome.sockets.tcp.disconnect(socketId, function() {
-    //chrome.sockets.tcp.close(socketId);
     tlsConnections[socketId].close();
     delete tlsConnections.socketId;
     delete receiveTextBuffers.socketId;
+    delete serverSideCloseRequests.socketId;
   });
 };
-
-//var certData = {};
-//createCertificate("localhost", certData);
 
 function createTLSConnection(clientSocketId) {
   return forge.tls.createConnection({
@@ -99,11 +89,9 @@ function createTLSConnection(clientSocketId) {
       receiveTextBuffers[connection.sessionId] = "";
     },
     getCertificate: function(c, hint) {
-      //return certData.localhost.cert;
       return certificate;
     },
     getPrivateKey: function(c, cert) {
-      //return certData.localhost.privateKey;
       return privateKey;
     },
     tlsDataReady: function(connection) {
@@ -118,7 +106,7 @@ function createTLSConnection(clientSocketId) {
       if (receiveTextBuffers[connection.sessionId].indexOf("\r\n\r\n") > -1) {
         console.log("Preparing response");
         connection.prepare(forge.util.encodeUtf8(responseText));
-        closeSignals[connection.sessionId] = true;
+        serverSideCloseRequests[connection.sessionId] = true;
       }
     },
     closed: function(connection) {
@@ -145,62 +133,7 @@ function sendEncryptedDataToClient(clientSocketId, bytes, close) {
     chrome.sockets.tcp.send
     (clientSocketId, buf.buffer, function(sendInfo) {
       console.log("sent encrypted bytes " + JSON.stringify(sendInfo));
-      if (closeSignals[clientSocketId]) {closeConnections(clientSocketId);}
+      if (serverSideCloseRequests[clientSocketId]) {closeConnections(clientSocketId);}
     });
   });
-}
-
-
-function createCertificate(cn, data) {
-  var keys = forge.pki.rsa.generateKeyPair(512);
-  var cert = forge.pki.createCertificate();
-  cert.publicKey = keys.publicKey;
-  cert.serialNumber = '01';
-  cert.validity.notBefore = new Date();
-  cert.validity.notAfter = new Date();
-  cert.validity.notAfter.setFullYear(
-      cert.validity.notBefore.getFullYear() + 1);
-  var attrs = [{
-    name: 'commonName',
-    value: cn
-  }, {
-    name: 'countryName',
-    value: 'US'
-  }, {
-    shortName: 'ST',
-    value: 'Test'
-  }, {
-    name: 'localityName',
-    value: 'Test'
-  }, {
-    name: 'organizationName',
-    value: 'Test'
-  }, {
-    shortName: 'OU',
-    value: 'Test'
-  }];
-  cert.setSubject(attrs);
-  cert.setIssuer(attrs);
-  cert.setExtensions([{
-    name: 'basicConstraints',
-    cA: true
-  }, {
-    name: 'keyUsage', 
-    keyCertSign: true,
-    digitalSignature: true,
-    nonRepudiation: true,
-    keyEncipherment: true,
-    dataEncipherment: true
-  }, {
-    name: 'subjectAltName',
-    altNames: [{
-      type: 2,
-      value: 'localhost'
-    }]
-  }]);
-  cert.sign(keys.privateKey, forge.md.sha256.create());
-  data[cn] = {
-    cert: forge.pki.certificateToPem(cert),
-    privateKey: forge.pki.privateKeyToPem(keys.privateKey)
-  };
 }
