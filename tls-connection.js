@@ -33,8 +33,8 @@ module.exports = function createTLSConnection(clientId, networkHandlers) {
 
       if (textBuffer.indexOf("\r\n\r\n") > -1) {
         console.log("Preparing response");
-        connection.prepare(forge.util.encodeUtf8(responseText));
         responseComplete = true;
+        connection.prepare(forge.util.encodeUtf8(responseText));
       }
     },
     closed: function(connection) {
@@ -44,7 +44,7 @@ module.exports = function createTLSConnection(clientId, networkHandlers) {
     error: function(connection, error) {
       console.log('uh oh' +  error.message);
       connection.close();
-      chrome.sockets.tcp.disconnect(connection.sessionId);
+      networkHandlers.disconnectHandler(connection.sessionId);
     }
   });
 };

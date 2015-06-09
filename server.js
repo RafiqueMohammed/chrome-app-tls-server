@@ -34,7 +34,9 @@
     stringifiedData = arrayBufferToString(recvInfo.data);
 
     console.log("processing encrypted data through tls");
-    connections[recvInfo.socketId].process(stringifiedData);
+    if (connections.hasOwnProperty(recvInfo.socketId)) {
+      connections[recvInfo.socketId].process(stringifiedData);
+    }
   });
 
   function networkOutputHandler(connection, responseComplete) {
@@ -45,6 +47,7 @@
       }
 
       var buf = stringToUint8Array(connection.tlsData.getBytes());
+      if (buf.byteLength === 0) { return; }
 
       console.log("Sending " + buf.byteLength + " encrypted bytes to " +
       "socket: " + connection.sessionId);
@@ -54,6 +57,7 @@
         console.log("sent encrypted bytes " + JSON.stringify(sendInfo));
         if (responseComplete) {
           connection.close();
+          delete connections[connection.socketId];
         }
       });
     });
@@ -61,6 +65,7 @@
 
   function networkDisconnectHandler(socket) {
     chrome.sockets.tcp.disconnect(socket);
+    delete connections[socket];
   }
 
   function arrayBufferToString(buffer) {
