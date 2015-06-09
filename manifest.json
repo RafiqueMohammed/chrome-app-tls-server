@@ -6,7 +6,7 @@
   "app": {
     "background": {
       "scripts": [
-        "tls-forge.js",
+        "forge-tls.js",
         "server-browserify.js"
       ]
     }
